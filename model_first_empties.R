@@ -6,6 +6,9 @@ library(lubridate)
 library(plyr)
 library(reshape2)
 library(quantreg)
+library(ggmap)
+library(MASS)
+library(Hmisc)
 
 stations <- read.csv('cabi-stations.csv')
 dat <- read.csv("first_empties.csv")
@@ -42,3 +45,45 @@ ggplot(qq, aes(date, frac_hour_cens)) +
 
 # TODO: for every dock, get last 3 months, find quantiles and trend, then
 # map
+summarize_dock <- function(dock) {
+    d <- subset(dock, date >= as.POSIXct(today() - months(3)) & weekday)
+    mod <- lm(frac_hour_cens ~ date_int, d)
+    data.frame(id=d$tfl_id[[1]],
+               quant=c(.1,.25,.5),
+               empty_time=quantile(d$frac_hour_cens,c(.1,.25,.5)),
+               trend=coef(mod)[[2]])
+}
+
+sum_dat <- ddply(dat, .(tfl_id), summarize_dock)
+
+sum_dat <- join(sum_dat, stations)
+
+mm <- get_map(location='Washington, DC', zoom=12, source='osm', color='bw')
+ggmap(mm, extent='device', darken=c(.5, 'black')) +
+    geom_point(data=subset(sum_dat, quant==.5),
+               mapping=aes(long,lat,color=empty_time),
+               size=4) +
+    scale_color_gradientn("Typical Empty Time", colours=rainbow(6),
+                          values=c(0,.1,.2,.3,.4,1),
+                          breaks=c(5,7,9,12,18,24))
+ggmap(mm, extent='device', darken=c(.5, 'black')) +
+    geom_point(data=subset(sum_dat, quant==.1),
+               mapping=aes(long,lat,color=empty_time),
+               size=4) +
+    scale_color_gradientn("Safe Commute Time", colours=rainbow(6),
+                          values=c(0,.1,.2,.3,.4,1),
+                          breaks=c(5,7,9,12,18,24))
+
+sum_dat$trend_trans <- log(abs(sum_dat$trend))*sign(sum_dat$trend)
+sum_dat$trend_cut <- cut2(sum_dat$trend,g=3)
+ggmap(mm, extent='device', darken=c(.5, 'black')) +
+    geom_point(data=subset(sum_dat, quant==.1),
+               mapping=aes(long,lat,color=trend_cut),
+               size=4) +
+    scale_color_brewer("Getting Worse",palette=5, labels=c('Worst','Middle','Best'))
+
+
+
+
+
+
