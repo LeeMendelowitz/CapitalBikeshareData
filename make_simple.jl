@@ -15,7 +15,7 @@ function get_first_empties(fh)
 	res = Dict{String, Dict{CalendarTime, Float64}}()
 	for line in eachline(fh)
 		tfl_id, bikes, spaces, ts = split(line, ",")
-		ts = Calendar.parse("yyyy-MM-dd HH:mm:ss", ts)
+		ts = timezone(Calendar.parse("yyyy-MM-dd HH:mm:ss", ts, "GMT"), "EST")
 		if day(ts) != day(curdate)
 			# add NA to docks that were never empty
 			for dock in keys(res)
@@ -31,11 +31,11 @@ function get_first_empties(fh)
 			#print(STDERR, "0 ")
 			if !haskey(res, tfl_id) 
 				res[tfl_id] = Dict{CalendarTime, Float64}()	
-				print(STDERR, "$tfl_id ")
+				#print(STDERR, "$tfl_id ")
 			end
 			if !haskey(res[tfl_id], curdate)
 				res[tfl_id][curdate] = hour(ts) + minute(ts)/60
-				println(STDERR, "$(res[tfl_id][curdate]) ")
+				#println(STDERR, "$(res[tfl_id][curdate]) ")
 			end
 			#print(STDERR, "\n")
 		end
